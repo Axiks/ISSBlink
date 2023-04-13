@@ -93,7 +93,9 @@ Step 3. Save the settings
 
 ### Secondary functions
 #### Change settings
+
 You can always change the settings of the tracker after its initial setup. To do this, you need to access the device's IP address.
+
 <img width="512" src="https://user-images.githubusercontent.com/36519646/231759478-11689a78-98ec-4b73-a0b3-b564758495c1.jpg" alt="Material Bread logo">
 
 > To access the settings, use the username "admin" and the password you created in the previous step (step 1.5).
