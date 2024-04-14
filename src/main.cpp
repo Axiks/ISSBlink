@@ -48,24 +48,24 @@ DynamicJsonDocument doc(2048);
 #define STRING_LEN 128
 #define NUMBER_LEN 32
 
-char satelliteId[NUMBER_LEN]; //"25544";
-char nekoLat[STRING_LEN];
-char nekoLon[STRING_LEN];
-char nekoObserverAlt[NUMBER_LEN]; // Observer's altitude above sea level in meters
-char minimumVisiblityBrightness[NUMBER_LEN];
-char numberOfDaysOfPrediction[NUMBER_LEN];
+char satelliteId[NUMBER_LEN] = "0"; //"25544";
+char nekoLat[STRING_LEN] = "0.000";
+char nekoLon[STRING_LEN] = "0.000";
+char nekoObserverAlt[NUMBER_LEN] = "0"; // Observer's altitude above sea level in meters
+char minimumVisiblityBrightness[NUMBER_LEN] = "0";
+char numberOfDaysOfPrediction[NUMBER_LEN] = "0";
 
 // DNSServer dnsServer;
 // WebServer server(80);
 // IotWebConf iotWebConf(thingName, &dnsServer, &server, wifiInitialApPassword);
 
-IotWebConfParameterGroup group1 = IotWebConfParameterGroup("group1", "ISS config");
-IotWebConfNumberParameter satelliteIdParam = IotWebConfNumberParameter("Satellite Id", "sateliteIdParam", satelliteId, NUMBER_LEN, "25544", "1..100000", "min='1' max='100000' step='1'");
-IotWebConfTextParameter nekoLatParam = IotWebConfTextParameter("Lat", "nekoLatParam", nekoLat, STRING_LEN, "0.000");
-IotWebConfTextParameter nekoLonParam = IotWebConfTextParameter("Lon", "nekoLonParam", nekoLon, STRING_LEN, "0.000");
-IotWebConfNumberParameter nekoObserverAltParam = IotWebConfNumberParameter("Observer alt", "nekoObserverAltParam", nekoObserverAlt, NUMBER_LEN, "100", "0..9000 metres", "min='0' max='9000' step='1'");
-IotWebConfNumberParameter minimumVisiblityBrightnessParam = IotWebConfNumberParameter("Minimum visiblity brightness", "minimumVisiblityBrightnessParam", minimumVisiblityBrightness, NUMBER_LEN, "100", "1..1000", "min='1' max='1000' step='1'");
-IotWebConfNumberParameter numberOfDaysOfPredictionParam = IotWebConfNumberParameter("Number of days of prediction", "numberOfDaysOfPrediction", numberOfDaysOfPrediction, NUMBER_LEN, "2", "max 10", "min='1' max='10' step='1'");
+// IotWebConfParameterGroup group1 = IotWebConfParameterGroup("group1", "ISS config");
+// IotWebConfNumberParameter satelliteIdParam = IotWebConfNumberParameter("Satellite Id", "sateliteIdParam", satelliteId, NUMBER_LEN, "25544", "1..100000", "min='1' max='100000' step='1'");
+// IotWebConfTextParameter nekoLatParam = IotWebConfTextParameter("Lat", "nekoLatParam", nekoLat, STRING_LEN, "0.000");
+// IotWebConfTextParameter nekoLonParam = IotWebConfTextParameter("Lon", "nekoLonParam", nekoLon, STRING_LEN, "0.000");
+// IotWebConfNumberParameter nekoObserverAltParam = IotWebConfNumberParameter("Observer alt", "nekoObserverAltParam", nekoObserverAlt, NUMBER_LEN, "100", "0..9000 metres", "min='0' max='9000' step='1'");
+// IotWebConfNumberParameter minimumVisiblityBrightnessParam = IotWebConfNumberParameter("Minimum visiblity brightness", "minimumVisiblityBrightnessParam", minimumVisiblityBrightness, NUMBER_LEN, "100", "1..1000", "min='1' max='1000' step='1'");
+// IotWebConfNumberParameter numberOfDaysOfPredictionParam = IotWebConfNumberParameter("Number of days of prediction", "numberOfDaysOfPrediction", numberOfDaysOfPrediction, NUMBER_LEN, "2", "max 10", "min='1' max='10' step='1'");
 
 bool timeLoad = false;
 bool issLoad = false;
@@ -310,24 +310,22 @@ class WebApp{
       WebServer *server;
       IotWebConf *iotWebConf;
 
-      // IotWebConfParameterGroup group1 = IotWebConfParameterGroup("group1", "ISS config");
-      // IotWebConfNumberParameter satelliteIdParam = IotWebConfNumberParameter("Satellite Id", "sateliteIdParam", satelliteId, NUMBER_LEN, "25544", "1..100000", "min='1' max='100000' step='1'");
-      // IotWebConfTextParameter nekoLatParam = IotWebConfTextParameter("Lat", "nekoLatParam", nekoLat, STRING_LEN, "0.000");
-      // IotWebConfTextParameter nekoLonParam = IotWebConfTextParameter("Lon", "nekoLonParam", nekoLon, STRING_LEN, "0.000");
-      // IotWebConfNumberParameter nekoObserverAltParam = IotWebConfNumberParameter("Observer alt", "nekoObserverAltParam", nekoObserverAlt, NUMBER_LEN, "100", "0..9000 metres", "min='0' max='9000' step='1'");
-      // IotWebConfNumberParameter minimumVisiblityBrightnessParam = IotWebConfNumberParameter("Minimum visiblity brightness", "minimumVisiblityBrightnessParam", minimumVisiblityBrightness, NUMBER_LEN, "100", "1..1000", "min='1' max='1000' step='1'");
-      // IotWebConfNumberParameter numberOfDaysOfPredictionParam = IotWebConfNumberParameter("Number of days of prediction", "numberOfDaysOfPrediction", numberOfDaysOfPrediction, NUMBER_LEN, "2", "max 10", "min='1' max='10' step='1'");
+      //IotWebConfParameterGroup group1 = IotWebConfParameterGroup("group1", "ISS config");
+      //IotWebConfNumberParameter satelliteIdParam = IotWebConfNumberParameter("Satellite Id", "sateliteIdParam", satelliteId, NUMBER_LEN, "25544", "1..100000", "min='1' max='100000' step='1'");
+      //IotWebConfTextParameter nekoLatParam = IotWebConfTextParameter("Lat", "nekoLatParam", nekoLat, STRING_LEN, "0.000");
+      //IotWebConfTextParameter nekoLonParam = IotWebConfTextParameter("Lon", "nekoLonParam", nekoLon, STRING_LEN, "0.000");
+      //IotWebConfNumberParameter nekoObserverAltParam = IotWebConfNumberParameter("Observer alt", "nekoObserverAltParam", nekoObserverAlt, NUMBER_LEN, "100", "0..9000 metres", "min='0' max='9000' step='1'");
+      //IotWebConfNumberParameter minimumVisiblityBrightnessParam = IotWebConfNumberParameter("Minimum visiblity brightness", "minimumVisiblityBrightnessParam", minimumVisiblityBrightness, NUMBER_LEN, "100", "1..1000", "min='1' max='1000' step='1'");
+      //IotWebConfNumberParameter numberOfDaysOfPredictionParam = IotWebConfNumberParameter("Number of days of prediction", "numberOfDaysOfPrediction", numberOfDaysOfPrediction, NUMBER_LEN, "2", "max 10", "min='1' max='10' step='1'");
 
       void initUi(){
-
-
-        group1.addItem(&satelliteIdParam);
-        group1.addItem(&nekoLatParam);
-        group1.addItem(&nekoLonParam);
-        group1.addItem(&nekoObserverAltParam);
-        group1.addItem(&minimumVisiblityBrightnessParam);
-        group1.addItem(&numberOfDaysOfPredictionParam);
-        iotWebConf -> addParameterGroup(&group1);
+        // group1.addItem(&satelliteIdParam);
+        // group1.addItem(&nekoLatParam);
+        // group1.addItem(&nekoLonParam);
+        // group1.addItem(&nekoObserverAltParam);
+        // group1.addItem(&minimumVisiblityBrightnessParam);
+        // group1.addItem(&numberOfDaysOfPredictionParam);
+        //iotWebConf -> addParameterGroup(&group1);
 
         //iotWebConf -> setWifiConnectionCallback(&configSaved);
         iotWebConf -> setConfigSavedCallback(&configSaved);
@@ -399,6 +397,7 @@ WebApp *myWebApp;
 void setup()
 {
     Serial.begin(115200);
+    clearEEPROM();
 
     nokiaDisplay = new NokiaDisplay();
     nokiaDisplay -> printText("Hello Neko Space!");
