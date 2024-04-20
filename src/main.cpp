@@ -32,8 +32,6 @@
 #define SCL_PIN 19
 #define LED_PIN 22
 
-// const char thingName[] = "ISS_Blink_AP";
-// const char wifiInitialApPassword[] = "12345678";
 // -- Method declarations.
 //void handleRoot();
 // -- Callback methods.
@@ -178,7 +176,7 @@ void configSaved()
 {
   Serial.println("Configuration was updated.");
   nokiaDisplay -> printText("Restart");
-  delay(500);
+  delay(1000);
   ESP.restart();
 }
 
@@ -398,31 +396,14 @@ void wifiConnected()
     Serial.println(ip);
     nokiaDisplay -> printText(ip);
 
-    // Display
-    
-    // display.clear();
-    // display.setTextAlignment(TEXT_ALIGN_LEFT);
-    // display.setFont(ArialMT_Plain_10);
-    // display.drawString(0, 0, "Wifi Connected!");
-    // display.setFont(ArialMT_Plain_16);
-    // display.drawString(0, 16, ip);
-    // // write the buffer to the display
-    // display.display();
-
     // Load time
     loadTime();
     timeLoad = true;
 
-    // // //Get ISS predictors
-    //iss();
-
+    //Get ISS predictors
     SateliteService sateliteService;
-    //satelitePredictions = new SatelitePredictions(mySatelite);
     satelitePredictions = new SatelitePredictions(mySatelite);
     *satelitePredictions = sateliteService.loadSatelitePrediction(mySatelite);
-    Serial.println("Satelite count from wifiConnected: ");
-    Serial.println(satelitePredictions -> count());
-    //*satelitePredictions = mySatelitePredictions;
     issLoad = true;
 
     // Off AP
@@ -545,19 +526,13 @@ void setup()
     Serial.println("Satelite lon: " + String(mySatelite -> lon));
     Serial.println("Satelite alt: " + String(mySatelite -> alt));
     Serial.println("Satelite minVisiblityBrightness: " + String(mySatelite -> minVisiblityBrightness));
-
-    //apControl -> down();
-
-    //SateliteService sateliteService;
-    //SatelitePredictions satelitePredictions = sateliteService.loadSatelitePrediction(&mySatelite);
-    // SateliteService sateliteService;
-    // SatelitePredictions satelitePredictions = sateliteService.loadSatelitePrediction(&mySatelite);
 }
 
 // unsigned long previousMillis = 0;
 // const long interval = 1000;
 
 int currentPassesIndex = 0;
+int loopDelay = 100;
 
 void loop() {
     // -- doLoop should be called as frequently as possible.
@@ -584,8 +559,22 @@ void loop() {
         //display.setFont(ArialMT_Plain_10);
         //display.drawString(120, 0, String(doc["passes"].size() - currentPassesIndex));
 
+        // Change the tracking date
+        if(currentPassesIndex + 1 < satelitePredictions->count()){
+          // implement load new prediction
+          loopDelay = 1000;
+        }
+        else {
+          nokiaDisplay -> printText("End prediction for " + mySatelite->name + "!");
+        }
+
+        if(satelitePredictions->predictions[currentPassesIndex]->getEndUTC() < now()){
+
+          currentPassesIndex++;
+        }
+
         // time to start
-        int timeToStart = satelitePredictions->predictions[0]->getStartUTC() - now();
+        int timeToStart = satelitePredictions->predictions[currentPassesIndex]->getStartUTC() - now();
         nokiaDisplay->printText("t -" + formTime(timeToStart));
 
         nokiaDisplay->printPredisctionsCount(satelitePredictions->count());
@@ -672,6 +661,6 @@ void loop() {
     }
     //display.display();
 
-    delay(100);
+    delay(loopDelay);
     nokiaDisplay -> clearDisplay();
 }
