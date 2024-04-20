@@ -32,10 +32,6 @@
 #define SCL_PIN 19
 #define LED_PIN 22
 
-//SSD1306Wire display(0x3c, SDA_PIN, SCL_PIN, GEOMETRY_128_32);
-
-DynamicJsonDocument doc(2048);
-
 // const char thingName[] = "ISS_Blink_AP";
 // const char wifiInitialApPassword[] = "12345678";
 // -- Method declarations.
@@ -48,26 +44,6 @@ DynamicJsonDocument doc(2048);
 #define STRING_LEN 128
 #define NUMBER_LEN 32
 
-// char* satelliteId[NUMBER_LEN];//"25544";
-// char nekoLat[STRING_LEN] = "0.000";
-// char nekoLon[STRING_LEN] = "0.000";
-// char nekoObserverAlt[NUMBER_LEN] = "1"; // Observer's altitude above sea level in meters
-// char minimumVisiblityBrightness[NUMBER_LEN] = "100";
-// char numberOfDaysOfPrediction[NUMBER_LEN] = "2";
-
-
-
-// DNSServer dnsServer;
-// WebServer server(80);
-// IotWebConf iotWebConf(thingName, &dnsServer, &server, wifiInitialApPassword);
-
-// IotWebConfParameterGroup group1 = IotWebConfParameterGroup("group1", "ISS config");
-// IotWebConfNumberParameter satelliteIdParam = IotWebConfNumberParameter("Satellite Id", "sateliteIdParam", satelliteId, NUMBER_LEN, "25544", "1..100000", "min='1' max='100000' step='1'");
-// IotWebConfTextParameter nekoLatParam = IotWebConfTextParameter("Lat", "nekoLatParam", nekoLat, STRING_LEN, "0.000");
-// IotWebConfTextParameter nekoLonParam = IotWebConfTextParameter("Lon", "nekoLonParam", nekoLon, STRING_LEN, "0.000");
-// IotWebConfNumberParameter nekoObserverAltParam = IotWebConfNumberParameter("Observer alt", "nekoObserverAltParam", nekoObserverAlt, NUMBER_LEN, "100", "0..9000 metres", "min='0' max='9000' step='1'");
-// IotWebConfNumberParameter minimumVisiblityBrightnessParam = IotWebConfNumberParameter("Minimum visiblity brightness", "minimumVisiblityBrightnessParam", minimumVisiblityBrightness, NUMBER_LEN, "100", "1..1000", "min='1' max='1000' step='1'");
-// IotWebConfNumberParameter numberOfDaysOfPredictionParam = IotWebConfNumberParameter("Number of days of prediction", "numberOfDaysOfPrediction", numberOfDaysOfPrediction, NUMBER_LEN, "2", "max 10", "min='1' max='10' step='1'");
 
 bool timeLoad = false;
 bool issLoad = false;
@@ -77,24 +53,49 @@ class NokiaDisplay {
       // Adafruit_PCD8544(CLK,DIN,D/C,CE,RST);
       Adafruit_PCD8544 displayNokia = Adafruit_PCD8544(18, 4, 0, 2, 15);
 
-      void initialize(){
+    public:
+      NokiaDisplay(){
         // -- Initializing the nokia display configuration.
         displayNokia.begin();
         displayNokia.setContrast(55);
         displayNokia.clearDisplay();
       }
 
-    public:
-      NokiaDisplay(){
-        initialize();
+      void printSateliteName(String name){
+        displayNokia.setTextSize(1);
+        displayNokia.setTextColor(BLACK);
+        displayNokia.setCursor(0,14);
+        displayNokia.println(name);
+        displayNokia.display();
       }
 
       void printText(String message){
-        displayNokia.clearDisplay();
+        //displayNokia.clearDisplay();
+        displayNokia.setTextSize(0.5);
+        displayNokia.setTextColor(BLACK);
+        displayNokia.setCursor(0,24);
+        displayNokia.println(message);
+        displayNokia.display();
+      }
+
+      void printTime(String time){
         displayNokia.setTextSize(1);
         displayNokia.setTextColor(BLACK);
         displayNokia.setCursor(0,0);
-        displayNokia.println(message);
+        displayNokia.println(time);
+        displayNokia.display();
+      }
+
+      void printPredisctionsCount(int count){
+        displayNokia.setTextSize(1);
+        displayNokia.setTextColor(BLACK);
+        displayNokia.setCursor(76,40);
+        displayNokia.println(count);
+        displayNokia.display();
+      }
+
+      void clearDisplay(){
+        displayNokia.clearDisplay();
         displayNokia.display();
       }
 
@@ -105,17 +106,13 @@ class OledDisplay {
     private:
       SSD1306Wire displayOled = SSD1306Wire(0x3c, SDA_PIN, SCL_PIN, GEOMETRY_128_32);
 
-      void initialize(){
+    public:
+      OledDisplay(){
         //Initialising the UI will init the display too.
         displayOled.init();
         displayOled.flipScreenVertically();
         displayOled.setTextAlignment(TEXT_ALIGN_LEFT);
         displayOled.setFont(ArialMT_Plain_10);
-      }
-
-    public:
-      OledDisplay(){
-        initialize();
       }
 
       void printText(String message){
@@ -214,6 +211,7 @@ class Satelite{
         this -> minVisiblityBrightness = minVisiblityBrightness;
         this -> predictionDays = predictionDays;}
 };
+
 class Prediction{
     private:
       int startUTC;
@@ -260,12 +258,15 @@ class Prediction{
 class SatelitePredictions{
     private:
       Satelite *satelite;
-      Prediction *predictions[15];
-      short predictionPushIndex = 0;
+      short predictionPushIndex;
     public:
+      Prediction *predictions[15];
+
       SatelitePredictions(Satelite *satelite)
       : satelite(satelite)
-      {}
+      {
+        predictionPushIndex = 0;
+      }
 
       Satelite *getSatelite(){
         return this -> satelite;
@@ -273,7 +274,12 @@ class SatelitePredictions{
 
       void addPrediction(Prediction *prediction){
         predictions[predictionPushIndex] = prediction;
+        Serial.print("ADDED PREDICTION!");
         predictionPushIndex++;
+      }
+
+      short count(){
+        return predictionPushIndex;
       }
 
       Prediction **getPredictions(){
@@ -283,8 +289,8 @@ class SatelitePredictions{
 class SateliteService{
     private:
       HTTPClient client;
+      DynamicJsonDocument doc = DynamicJsonDocument(2048);
     public:
-
       SateliteService()
       {
         client.addHeader("Content-Type", "application/json");
@@ -292,6 +298,7 @@ class SateliteService{
 
       SatelitePredictions loadSatelitePrediction(Satelite *satelite){
         String url = "https://api.n2yo.com/rest/v1/satellite/visualpasses/" + String(satelite->id) + '/' + String(satelite->lat) + '/' + String(satelite->lon) + '/' + String(satelite->alt) + '/' + String(satelite->predictionDays) + '/' + String(satelite->minVisiblityBrightness) + "/&apiKey=" + APIKEY;
+        Serial.println("URL: " + url);
         client.begin(url);
 
         int httpCode = client.GET();
@@ -316,16 +323,18 @@ class SateliteService{
                 Serial.println(doc.size());
             }
 
-            SatelitePredictions satelitePredictions = SatelitePredictions(satelite);
+            SatelitePredictions mySatelitePredictions = SatelitePredictions(satelite);
             
             int size = doc["passes"].size();
+            String satName = doc["info"]["satname"];
+            satelite -> name = satName;
             for(int i=0; i < size; i++){
                 int startUTC = doc["passes"][i]["startUTC"];
                 int maxUTC = doc["passes"][i]["maxUTC"];
                 int endUTC = doc["passes"][i]["endUTC"];
                 int duration = doc["passes"][i]["duration"];
 
-                satelitePredictions.addPrediction(new Prediction(startUTC, maxUTC, endUTC, duration));
+                mySatelitePredictions.addPrediction(new Prediction(startUTC, maxUTC, endUTC, duration));
 
                 Serial.println("\nStart UTC: ");
                 Serial.println(String(hour(startUTC)) + ":" + String(minute(startUTC))+ ":" + String(second(startUTC)));
@@ -336,7 +345,10 @@ class SateliteService{
                 Serial.println("Duration: ");
                 Serial.println(String(duration));
             }
-            return satelitePredictions;
+            Serial.println("End of added predictions!");
+            Serial.println("Count of predictions: ");
+            Serial.println(mySatelitePredictions.count());
+            return mySatelitePredictions;
         }
         return NULL;
       }
@@ -357,7 +369,8 @@ class APControl{
 
       void up(){
         // -- Init AP
-        iotWebConf.setApTimeoutMs(3000);
+        iotWebConf.setApTimeoutMs(1000);
+        iotWebConf.setWifiConnectionTimeoutMs(5000);
         bool isInitConf = iotWebConf.init();
         Serial.println("AP configuration init status: " + String(isInitConf));
         if(isInitConf){
@@ -376,6 +389,7 @@ class APControl{
 //25544, "ISS", "0.000", "0.000", "1", "100", "2"
 Satelite *mySatelite;
 APControl *apControl;
+SatelitePredictions *satelitePredictions;
 
 void wifiConnected()
 {
@@ -401,10 +415,15 @@ void wifiConnected()
 
     // // //Get ISS predictors
     //iss();
-    //issLoad = true;
 
     SateliteService sateliteService;
-    SatelitePredictions satelitePredictions = sateliteService.loadSatelitePrediction(mySatelite);
+    //satelitePredictions = new SatelitePredictions(mySatelite);
+    satelitePredictions = new SatelitePredictions(mySatelite);
+    *satelitePredictions = sateliteService.loadSatelitePrediction(mySatelite);
+    Serial.println("Satelite count from wifiConnected: ");
+    Serial.println(satelitePredictions -> count());
+    //*satelitePredictions = mySatelitePredictions;
+    issLoad = true;
 
     // Off AP
     apControl -> down();
@@ -492,6 +511,10 @@ class WebApp{
         // -- Init AP
         bool initConf = iotWebConf->init();
         satelite -> predictionDays = atoi(predictionDays);
+        satelite -> lat = atof(lat);
+        satelite -> lon = atof(lon);
+        satelite -> alt = atof(observerAlt);
+        satelite -> minVisiblityBrightness = atof(minVisiblityBrightness);
       }
 };
 
@@ -507,10 +530,10 @@ void setup()
 
     OledDisplay oledDisplay;
     oledDisplay.printText("Start");
-    delay(2000);
     oledDisplay.printText("Hello Neko Space!");
 
     mySatelite = new Satelite(25544, "ISS", 0.000, 0.000, 1, 100, 2);
+    //satelitePredictions = new SatelitePredictions(mySatelite);
 
     apControl = new APControl();
     //apControl -> up();
@@ -518,6 +541,10 @@ void setup()
     myWebApp = new WebApp(&apControl->server, &apControl->iotWebConf, mySatelite);
     myWebApp -> start();
     Serial.println("Satelite predictions days: " + String(mySatelite -> predictionDays));
+    Serial.println("Satelite lat: " + String(mySatelite -> lat));
+    Serial.println("Satelite lon: " + String(mySatelite -> lon));
+    Serial.println("Satelite alt: " + String(mySatelite -> alt));
+    Serial.println("Satelite minVisiblityBrightness: " + String(mySatelite -> minVisiblityBrightness));
 
     //apControl -> down();
 
@@ -540,97 +567,111 @@ void loop() {
     // display.setTextAlignment(TEXT_ALIGN_LEFT);
 
     if(timeLoad){
-        String timeNowFormated = "time " + formTime(now()+(60*60));
-        nokiaDisplay -> printText(timeNowFormated);
+        String timeNowFormated = "t now " + formTime(now()+(2*60*60));
+        nokiaDisplay -> printTime(timeNowFormated);
+        //nokiaDisplay -> printText(timeNowFormated);
         //display.setFont(ArialMT_Plain_10);
         //display.drawString(0, 0, timeNowFormated);
         // display.display();
     }
 
-    // if(issLoad){
-    //   if(doc["passes"].size() > 0){
-    //     // DisplaycurrentPassesIndex 
-    //     //display.setFont(ArialMT_Plain_10);
-    //     //display.drawString(120, 0, String(doc["passes"].size() - currentPassesIndex));
-    //     nokiaDisplay->printText(String(doc["passes"].size() - currentPassesIndex));
+    if(issLoad){
+      //Serial.println("Satelite count: ");
+      //Serial.println(satelitePredictions->count());
+      if(satelitePredictions->count() > 0){
+        //Serial.println("Satelite c");
+        // DisplaycurrentPassesIndex 
+        //display.setFont(ArialMT_Plain_10);
+        //display.drawString(120, 0, String(doc["passes"].size() - currentPassesIndex));
 
-    //     // Display time AVG
-    // //     time_t tStart = doc["passes"][currentPassesIndex]["startUTC"];
-    // //     time_t tMax = doc["passes"][currentPassesIndex]["maxUTC"];
-    // //     time_t tEnd = doc["passes"][currentPassesIndex]["endUTC"];
-    // //     // Serial.println("Start passes time: " + formTime(tStart+(60*60)));
-    // //     // Serial.println("Max passes time: " + formTime(tMax+(60*60)));
-    // //     // Serial.println("End passes time: " + formTime(tEnd+(60*60)));
+        // time to start
+        int timeToStart = satelitePredictions->predictions[0]->getStartUTC() - now();
+        nokiaDisplay->printText("t -" + formTime(timeToStart));
 
-    // //     int avgStart = tStart - now();
-    // //     int avgMax = tMax - now();
-    // //     int avgEnd = tEnd - now();
+        nokiaDisplay->printPredisctionsCount(satelitePredictions->count());
 
-    // //     if(now() <= tStart){
-    // //       display.setFont(ArialMT_Plain_16);
-    // //       display.drawString(0, 16, "- " + formTime(avgStart));
-    // //     }
-    // //     else if(now() > tStart && now() <= tMax){
-    // //       display.setFont(ArialMT_Plain_16);
-    // //       display.drawString(0, 16, "MAX - " + formTime(avgMax));
-    // //     }
-    // //     else if(now() > tMax && now() <= tEnd){
-    // //       display.setFont(ArialMT_Plain_16);
-    // //       display.drawString(0, 16, "+ " + formTime(avgEnd));
-    // //     }
+        // // Display satelite name
+        // String satName = doc["info"]["satname"];
+        nokiaDisplay->printSateliteName(mySatelite->name);
 
-    // //     // display.setFont(ArialMT_Plain_10);
-    // //     // display.setTextAlignment(TEXT_ALIGN_RIGHT);
-    // //     // display.drawString(128, 54, String(millis()));
-    // //     // write the buffer to the display
-    // //     // display.display();
+        // Display time AVG
+        // time_t tStart = doc["passes"][currentPassesIndex]["startUTC"];
+        // time_t tMax = doc["passes"][currentPassesIndex]["maxUTC"];
+        // time_t tEnd = doc["passes"][currentPassesIndex]["endUTC"];
+        // // Serial.println("Start passes time: " + formTime(tStart+(60*60)));
+        // // Serial.println("Max passes time: " + formTime(tMax+(60*60)));
+        // // Serial.println("End passes time: " + formTime(tEnd+(60*60)));
 
-    // //     // Led blink
-    // //     // Blink before arrival
-    // //     int startTimeBlink = tStart - (60*30);
+        // int avgStart = tStart - now();
+        // int avgMax = tMax - now();
+        // int avgEnd = tEnd - now();
 
-    // //     unsigned long currentMillis = millis();
-    // //     if(now() >= startTimeBlink && now() < tStart){
-    // //         if (currentMillis - previousMillis >= interval) {
-    // //             // save the last time you blinked the LED
-    // //             previousMillis = currentMillis;
-    // //             // if the LED is off turn it on and vice-versa:
-    // //             if (ledState == LOW) {
-    // //                 ledState = HIGH;
-    // //             } else {
-    // //                 ledState = LOW;
-    // //             }
-    // //             // set the LED with the ledState of the variable:
-    // //             digitalWrite(LED_PIN, ledState);
-    // //         }
-    // //     }
-    // //     else if(now() >= tStart && now() < tEnd){
-    // //         // Shine during the flight
-    // //         digitalWrite(LED_PIN, HIGH);
-    // //     }
-    // //     else if(now() >= tEnd){
-    // //         previousMillis = 0;
-    // //         ledState = LOW;
-    // //         digitalWrite(LED_PIN, LOW);
-    // //         // Change the tracking date
-    // //         if(currentPassesIndex + 1 < doc["passes"].size()){
-    // //           currentPassesIndex++;
-    // //         }
-    // //         else {
-    // //           String satName = doc["info"]["satname"];
-    // //           display.setFont(ArialMT_Plain_16);
-    // //           display.drawString(0, 16, "End prediction for " + satName + "!");
-    // //         }
-    // //     }
-    // //   }
-    // //   else{
-    // //     String satName = doc["info"]["satname"];
-    // //     String message = "Not " + satName + "!";
-    // //     display.setFont(ArialMT_Plain_16);
-    // //     display.drawString(0, 16, message);
-    //   }
-    // }
+        // if(now() <= tStart){
+        //   display.setFont(ArialMT_Plain_16);
+        //   display.drawString(0, 16, "- " + formTime(avgStart));
+        // }
+        // else if(now() > tStart && now() <= tMax){
+        //   display.setFont(ArialMT_Plain_16);
+        //   display.drawString(0, 16, "MAX - " + formTime(avgMax));
+        // }
+        // else if(now() > tMax && now() <= tEnd){
+        //   display.setFont(ArialMT_Plain_16);
+        //   display.drawString(0, 16, "+ " + formTime(avgEnd));
+        // }
+
+        // // display.setFont(ArialMT_Plain_10);
+        // // display.setTextAlignment(TEXT_ALIGN_RIGHT);
+        // // display.drawString(128, 54, String(millis()));
+        // // write the buffer to the display
+        // // display.display();
+
+        // // Led blink
+        // // Blink before arrival
+        // int startTimeBlink = tStart - (60*30);
+
+        // unsigned long currentMillis = millis();
+        // if(now() >= startTimeBlink && now() < tStart){
+        //     if (currentMillis - previousMillis >= interval) {
+        //         // save the last time you blinked the LED
+        //         previousMillis = currentMillis;
+        //         // if the LED is off turn it on and vice-versa:
+        //         if (ledState == LOW) {
+        //             ledState = HIGH;
+        //         } else {
+        //             ledState = LOW;
+        //         }
+        //         // set the LED with the ledState of the variable:
+        //         digitalWrite(LED_PIN, ledState);
+        //     }
+        // }
+        // else if(now() >= tStart && now() < tEnd){
+        //     // Shine during the flight
+        //     digitalWrite(LED_PIN, HIGH);
+        // }
+        // else if(now() >= tEnd){
+        //     previousMillis = 0;
+        //     ledState = LOW;
+        //     digitalWrite(LED_PIN, LOW);
+        //     // Change the tracking date
+        //     if(currentPassesIndex + 1 < doc["passes"].size()){
+        //       currentPassesIndex++;
+        //     }
+        //     else {
+        //       String satName = doc["info"]["satname"];
+        //       display.setFont(ArialMT_Plain_16);
+        //       display.drawString(0, 16, "End prediction for " + satName + "!");
+        //     }
+        // }
+      }
+      else{
+        // String satName = doc["info"]["satname"];
+        // String message = "Not " + satName + "!";
+        // display.setFont(ArialMT_Plain_16);
+        // display.drawString(0, 16, message);
+      }
+    }
     //display.display();
 
-    delay(200);
+    delay(100);
+    nokiaDisplay -> clearDisplay();
 }
