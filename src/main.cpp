@@ -48,12 +48,14 @@ DynamicJsonDocument doc(2048);
 #define STRING_LEN 128
 #define NUMBER_LEN 32
 
-char satelliteId[NUMBER_LEN] = "0"; //"25544";
-char nekoLat[STRING_LEN] = "0.000";
-char nekoLon[STRING_LEN] = "0.000";
-char nekoObserverAlt[NUMBER_LEN] = "0"; // Observer's altitude above sea level in meters
-char minimumVisiblityBrightness[NUMBER_LEN] = "0";
-char numberOfDaysOfPrediction[NUMBER_LEN] = "0";
+// char* satelliteId[NUMBER_LEN];//"25544";
+// char nekoLat[STRING_LEN] = "0.000";
+// char nekoLon[STRING_LEN] = "0.000";
+// char nekoObserverAlt[NUMBER_LEN] = "1"; // Observer's altitude above sea level in meters
+// char minimumVisiblityBrightness[NUMBER_LEN] = "100";
+// char numberOfDaysOfPrediction[NUMBER_LEN] = "2";
+
+
 
 // DNSServer dnsServer;
 // WebServer server(80);
@@ -175,58 +177,6 @@ void loadTime(){
   formTime(now());
 }
 
-void iss(){
-    HTTPClient client;
-
-    //String days = "2"; // Number of days of prediction (max 10)
-    // String min_visibility = "100"; //300
-    String url = "https://api.n2yo.com/rest/v1/satellite/visualpasses/" + String(satelliteId) + '/' + nekoLat + '/' + nekoLon + '/' + nekoObserverAlt + '/'+ numberOfDaysOfPrediction +'/' + minimumVisiblityBrightness + "/&apiKey=" + APIKEY;
-    Serial.println(url);
-    client.begin(url);
-    client.addHeader("Content-Type", "application/json");
-
-    int httpCode = client.GET();
-
-    if(httpCode > 0) {
-        String payload = client.getString();
-        Serial.println("\nStatus code: " + String(httpCode));
-        Serial.println(payload);
-
-        char json[2048];
-        payload.toCharArray(json, 2048);
-
-        DeserializationError error = deserializeJson(doc, json);
-
-        if(error){
-            Serial.println("DeserializationError: ");
-            Serial.println(error.f_str());
-            return;
-        }
-        else{
-            Serial.println("Parse Success!\nSize:");
-            Serial.println(doc.size());
-        }
-        
-        int size = doc["passes"].size();
-        for(int i=0; i < size; i++){
-            int startUTC = doc["passes"][i]["startUTC"];
-            int maxUTC = doc["passes"][i]["maxUTC"];
-            int endUTC = doc["passes"][i]["endUTC"];
-            int duration = doc["passes"][i]["duration"];
-
-            Serial.println("\nStart UTC: ");
-            Serial.println(String(hour(startUTC)) + ":" + String(minute(startUTC))+ ":" + String(second(startUTC)));
-            Serial.println("Max UTC: ");
-            Serial.println(String(hour(maxUTC)) + ":" + String(minute(maxUTC))+ ":" + String(second(maxUTC)));
-            Serial.println("End UTC: ");
-            Serial.println(String(hour(endUTC)) + ":" + String(minute(endUTC))+ ":" + String(second(endUTC)));
-            Serial.println("Duration: ");
-            Serial.println(String(duration));
-        }
-    }
-}
-
-
 void configSaved()
 {
   Serial.println("Configuration was updated.");
@@ -245,7 +195,187 @@ void clearEEPROM()
     Serial.println("End clear EEPROM!");
 }
 
+class Satelite{
+    public:
+      int id;
+      String name;
+      float lat;
+      float lon;
+      float alt;
+      float minVisiblityBrightness;
+      int predictionDays;
 
+      Satelite(int id, String name, float lat, float lon, float alt, float minVisiblityBrightness, int predictionDays){
+        this -> id = id;
+        this -> name = name;
+        this -> lat = lat;
+        this -> lon = lon;
+        this -> alt = alt;
+        this -> minVisiblityBrightness = minVisiblityBrightness;
+        this -> predictionDays = predictionDays;}
+};
+class Prediction{
+    private:
+      int startUTC;
+      int maxUTC;
+      int endUTC;
+      int duration;
+    public:
+      Prediction(int startUTC, int maxUTC, int endUTC, int duration)
+      : startUTC(startUTC), maxUTC(maxUTC), endUTC(endUTC), duration(duration)
+      {}
+
+      void setStartUTC(int startUTC){
+        this -> startUTC = startUTC;
+      }
+
+      int getStartUTC(){
+        return this -> startUTC;
+      }
+
+      void setMaxUTC(int maxUTC){
+        this -> maxUTC = maxUTC;
+      }
+
+      int getMaxUTC(){
+        return this -> maxUTC;
+      }
+
+      void setEndUTC(int endUTC){
+        this -> endUTC = endUTC;
+      }
+
+      int getEndUTC(){
+        return this -> endUTC;
+      }
+
+      void setDuration(int duration){
+        this -> duration = duration;
+      }
+
+      int getDuration(){
+        return this -> duration;
+      }
+};
+class SatelitePredictions{
+    private:
+      Satelite *satelite;
+      Prediction *predictions[15];
+      short predictionPushIndex = 0;
+    public:
+      SatelitePredictions(Satelite *satelite)
+      : satelite(satelite)
+      {}
+
+      Satelite *getSatelite(){
+        return this -> satelite;
+      }
+
+      void addPrediction(Prediction *prediction){
+        predictions[predictionPushIndex] = prediction;
+        predictionPushIndex++;
+      }
+
+      Prediction **getPredictions(){
+        return this -> predictions;
+      }
+};
+class SateliteService{
+    private:
+      HTTPClient client;
+    public:
+
+      SateliteService()
+      {
+        client.addHeader("Content-Type", "application/json");
+      }
+
+      SatelitePredictions loadSatelitePrediction(Satelite *satelite){
+        String url = "https://api.n2yo.com/rest/v1/satellite/visualpasses/" + String(satelite->id) + '/' + String(satelite->lat) + '/' + String(satelite->lon) + '/' + String(satelite->alt) + '/' + String(satelite->predictionDays) + '/' + String(satelite->minVisiblityBrightness) + "/&apiKey=" + APIKEY;
+        client.begin(url);
+
+        int httpCode = client.GET();
+
+        if(httpCode > 0) {
+            String payload = client.getString();
+            Serial.println("\nStatus code: " + String(httpCode));
+            Serial.println(payload);
+
+            char json[2048];
+            payload.toCharArray(json, 2048);
+
+            DeserializationError error = deserializeJson(doc, json);
+
+            if(error){
+                Serial.println("DeserializationError: ");
+                Serial.println(error.f_str());
+                return NULL;
+            }
+            else{
+                Serial.println("Parse Success!\nSize:");
+                Serial.println(doc.size());
+            }
+
+            SatelitePredictions satelitePredictions = SatelitePredictions(satelite);
+            
+            int size = doc["passes"].size();
+            for(int i=0; i < size; i++){
+                int startUTC = doc["passes"][i]["startUTC"];
+                int maxUTC = doc["passes"][i]["maxUTC"];
+                int endUTC = doc["passes"][i]["endUTC"];
+                int duration = doc["passes"][i]["duration"];
+
+                satelitePredictions.addPrediction(new Prediction(startUTC, maxUTC, endUTC, duration));
+
+                Serial.println("\nStart UTC: ");
+                Serial.println(String(hour(startUTC)) + ":" + String(minute(startUTC))+ ":" + String(second(startUTC)));
+                Serial.println("Max UTC: ");
+                Serial.println(String(hour(maxUTC)) + ":" + String(minute(maxUTC))+ ":" + String(second(maxUTC)));
+                Serial.println("End UTC: ");
+                Serial.println(String(hour(endUTC)) + ":" + String(minute(endUTC))+ ":" + String(second(endUTC)));
+                Serial.println("Duration: ");
+                Serial.println(String(duration));
+            }
+            return satelitePredictions;
+        }
+        return NULL;
+      }
+};
+
+class APControl{
+    private:
+      DNSServer dnsServer = DNSServer();
+      const char apName[31] = "ISS_Blink_AP";
+      const char apInitialPassword[31] = "12345678";
+
+    public:
+      IotWebConf iotWebConf;
+      WebServer server;
+      APControl()
+      : server(80), iotWebConf(apName, &dnsServer, &server, apInitialPassword)
+      {};
+
+      void up(){
+        // -- Init AP
+        iotWebConf.setApTimeoutMs(3000);
+        bool isInitConf = iotWebConf.init();
+        Serial.println("AP configuration init status: " + String(isInitConf));
+        if(isInitConf){
+          nokiaDisplay -> printText("In AP mode");
+        }
+      }
+
+      void down(){
+        iotWebConf.goOffLine();
+        //Turn OFF WiFi!
+        WiFi.disconnect();
+        WiFi.mode(WIFI_OFF);
+      }
+};
+
+//25544, "ISS", "0.000", "0.000", "1", "100", "2"
+Satelite *mySatelite;
+APControl *apControl;
 
 void wifiConnected()
 {
@@ -270,64 +400,38 @@ void wifiConnected()
     timeLoad = true;
 
     // // //Get ISS predictors
-    iss();
-    issLoad = true;
+    //iss();
+    //issLoad = true;
+
+    SateliteService sateliteService;
+    SatelitePredictions satelitePredictions = sateliteService.loadSatelitePrediction(mySatelite);
+
+    // Off AP
+    apControl -> down();
 }
-
-class APControl{
-    private:
-      DNSServer dnsServer;
-      const char apName[31] = "ISS_Blink_AP";
-      const char apInitialPassword[31] = "12345678";
-
-    public:
-      IotWebConf iotWebConf;
-      WebServer server;
-      APControl()
-      : server(80), iotWebConf(apName, &dnsServer, &server, apInitialPassword)
-      {};
-
-      void up(){
-        // -- Init AP
-        iotWebConf.setApTimeoutMs(3000);
-        bool isInitConf = iotWebConf.init();
-        Serial.println("AP configuration init status: " + String(isInitConf));
-        if(isInitConf){
-          nokiaDisplay -> printText("In AP mode");
-        }
-      }
-
-      void down(){
-        //Turn OFF WiFi!
-        //WiFi.disconnect();
-        //WiFi.mode(WIFI_OFF);
-        iotWebConf.goOffLine();
-      }
-};
 
 class WebApp{
     private:
       WebServer *server;
       IotWebConf *iotWebConf;
+      IotWebConfParameterGroup* group1 = new IotWebConfParameterGroup("group1", "ISS config");
+      Satelite *satelite;
 
-      //IotWebConfParameterGroup group1 = IotWebConfParameterGroup("group1", "ISS config");
-      //IotWebConfNumberParameter satelliteIdParam = IotWebConfNumberParameter("Satellite Id", "sateliteIdParam", satelliteId, NUMBER_LEN, "25544", "1..100000", "min='1' max='100000' step='1'");
-      //IotWebConfTextParameter nekoLatParam = IotWebConfTextParameter("Lat", "nekoLatParam", nekoLat, STRING_LEN, "0.000");
-      //IotWebConfTextParameter nekoLonParam = IotWebConfTextParameter("Lon", "nekoLonParam", nekoLon, STRING_LEN, "0.000");
-      //IotWebConfNumberParameter nekoObserverAltParam = IotWebConfNumberParameter("Observer alt", "nekoObserverAltParam", nekoObserverAlt, NUMBER_LEN, "100", "0..9000 metres", "min='0' max='9000' step='1'");
-      //IotWebConfNumberParameter minimumVisiblityBrightnessParam = IotWebConfNumberParameter("Minimum visiblity brightness", "minimumVisiblityBrightnessParam", minimumVisiblityBrightness, NUMBER_LEN, "100", "1..1000", "min='1' max='1000' step='1'");
-      //IotWebConfNumberParameter numberOfDaysOfPredictionParam = IotWebConfNumberParameter("Number of days of prediction", "numberOfDaysOfPrediction", numberOfDaysOfPrediction, NUMBER_LEN, "2", "max 10", "min='1' max='10' step='1'");
-
+      char lat[7];
+      char lon[7];
+      char observerAlt[7];
+      char minVisiblityBrightness[7];
+      char predictionDays[7];
+      
       void initUi(){
-        // group1.addItem(&satelliteIdParam);
-        // group1.addItem(&nekoLatParam);
-        // group1.addItem(&nekoLonParam);
-        // group1.addItem(&nekoObserverAltParam);
-        // group1.addItem(&minimumVisiblityBrightnessParam);
-        // group1.addItem(&numberOfDaysOfPredictionParam);
-        //iotWebConf -> addParameterGroup(&group1);
+        group1->addItem(new IotWebConfTextParameter("Lat", "nekoLatParam", lat, STRING_LEN, "0.000"));
+        group1->addItem(new IotWebConfTextParameter("Lon", "nekoLonParam", lon, STRING_LEN, "0.000"));
+        group1->addItem(new IotWebConfNumberParameter("Observer alt", "nekoObserverAltParam", observerAlt, NUMBER_LEN, "100", "0..9000 metres", "min='0' max='9000' step='1'"));
+        group1->addItem(new IotWebConfNumberParameter("Minimum visiblity brightness", "minimumVisiblityBrightnessParam", minVisiblityBrightness, NUMBER_LEN, "100", "1..1000", "min='1' max='1000' step='1'"));
+        group1->addItem(new IotWebConfNumberParameter("Number of days of prediction", "numberOfDaysOfPrediction", predictionDays, NUMBER_LEN, "2", "max 10", "min='1' max='10' step='1'"));
+        iotWebConf->addParameterGroup(group1);
 
-        //iotWebConf -> setWifiConnectionCallback(&configSaved);
+        iotWebConf -> setWifiConnectionCallback(&configSaved);
         iotWebConf -> setConfigSavedCallback(&configSaved);
         //iotWebConf -> setFormValidator(&formValidator);
         iotWebConf -> getApTimeoutParameter()->visible = true;
@@ -377,8 +481,8 @@ class WebApp{
       DNSServer dnsServer;
 
     public:
-      WebApp(WebServer *server, IotWebConf *iotWebConf)
-      : server(server), iotWebConf(iotWebConf)
+      WebApp(WebServer *server, IotWebConf *iotWebConf, Satelite *satelite)
+      : server(server), iotWebConf(iotWebConf), satelite(satelite)
       {
         initUi();
         initRoutes();
@@ -387,17 +491,16 @@ class WebApp{
       void start(){
         // -- Init AP
         bool initConf = iotWebConf->init();
-        Serial.println("Init WEB APP configuration status: " + String(initConf));
+        satelite -> predictionDays = atoi(predictionDays);
       }
 };
 
-APControl *apControl;
 WebApp *myWebApp;
 
 void setup()
 {
     Serial.begin(115200);
-    clearEEPROM();
+    //clearEEPROM();
 
     nokiaDisplay = new NokiaDisplay();
     nokiaDisplay -> printText("Hello Neko Space!");
@@ -407,11 +510,21 @@ void setup()
     delay(2000);
     oledDisplay.printText("Hello Neko Space!");
 
-    apControl = new APControl();
-    apControl -> up();
+    mySatelite = new Satelite(25544, "ISS", 0.000, 0.000, 1, 100, 2);
 
-    myWebApp = new WebApp(&apControl->server, &apControl->iotWebConf);
+    apControl = new APControl();
+    //apControl -> up();
+
+    myWebApp = new WebApp(&apControl->server, &apControl->iotWebConf, mySatelite);
     myWebApp -> start();
+    Serial.println("Satelite predictions days: " + String(mySatelite -> predictionDays));
+
+    //apControl -> down();
+
+    //SateliteService sateliteService;
+    //SatelitePredictions satelitePredictions = sateliteService.loadSatelitePrediction(&mySatelite);
+    // SateliteService sateliteService;
+    // SatelitePredictions satelitePredictions = sateliteService.loadSatelitePrediction(&mySatelite);
 }
 
 // unsigned long previousMillis = 0;
@@ -434,89 +547,89 @@ void loop() {
         // display.display();
     }
 
-    if(issLoad){
-      if(doc["passes"].size() > 0){
-        // DisplaycurrentPassesIndex 
-        //display.setFont(ArialMT_Plain_10);
-        //display.drawString(120, 0, String(doc["passes"].size() - currentPassesIndex));
-        nokiaDisplay->printText(String(doc["passes"].size() - currentPassesIndex));
+    // if(issLoad){
+    //   if(doc["passes"].size() > 0){
+    //     // DisplaycurrentPassesIndex 
+    //     //display.setFont(ArialMT_Plain_10);
+    //     //display.drawString(120, 0, String(doc["passes"].size() - currentPassesIndex));
+    //     nokiaDisplay->printText(String(doc["passes"].size() - currentPassesIndex));
 
-        // Display time AVG
-    //     time_t tStart = doc["passes"][currentPassesIndex]["startUTC"];
-    //     time_t tMax = doc["passes"][currentPassesIndex]["maxUTC"];
-    //     time_t tEnd = doc["passes"][currentPassesIndex]["endUTC"];
-    //     // Serial.println("Start passes time: " + formTime(tStart+(60*60)));
-    //     // Serial.println("Max passes time: " + formTime(tMax+(60*60)));
-    //     // Serial.println("End passes time: " + formTime(tEnd+(60*60)));
+    //     // Display time AVG
+    // //     time_t tStart = doc["passes"][currentPassesIndex]["startUTC"];
+    // //     time_t tMax = doc["passes"][currentPassesIndex]["maxUTC"];
+    // //     time_t tEnd = doc["passes"][currentPassesIndex]["endUTC"];
+    // //     // Serial.println("Start passes time: " + formTime(tStart+(60*60)));
+    // //     // Serial.println("Max passes time: " + formTime(tMax+(60*60)));
+    // //     // Serial.println("End passes time: " + formTime(tEnd+(60*60)));
 
-    //     int avgStart = tStart - now();
-    //     int avgMax = tMax - now();
-    //     int avgEnd = tEnd - now();
+    // //     int avgStart = tStart - now();
+    // //     int avgMax = tMax - now();
+    // //     int avgEnd = tEnd - now();
 
-    //     if(now() <= tStart){
-    //       display.setFont(ArialMT_Plain_16);
-    //       display.drawString(0, 16, "- " + formTime(avgStart));
-    //     }
-    //     else if(now() > tStart && now() <= tMax){
-    //       display.setFont(ArialMT_Plain_16);
-    //       display.drawString(0, 16, "MAX - " + formTime(avgMax));
-    //     }
-    //     else if(now() > tMax && now() <= tEnd){
-    //       display.setFont(ArialMT_Plain_16);
-    //       display.drawString(0, 16, "+ " + formTime(avgEnd));
-    //     }
+    // //     if(now() <= tStart){
+    // //       display.setFont(ArialMT_Plain_16);
+    // //       display.drawString(0, 16, "- " + formTime(avgStart));
+    // //     }
+    // //     else if(now() > tStart && now() <= tMax){
+    // //       display.setFont(ArialMT_Plain_16);
+    // //       display.drawString(0, 16, "MAX - " + formTime(avgMax));
+    // //     }
+    // //     else if(now() > tMax && now() <= tEnd){
+    // //       display.setFont(ArialMT_Plain_16);
+    // //       display.drawString(0, 16, "+ " + formTime(avgEnd));
+    // //     }
 
-    //     // display.setFont(ArialMT_Plain_10);
-    //     // display.setTextAlignment(TEXT_ALIGN_RIGHT);
-    //     // display.drawString(128, 54, String(millis()));
-    //     // write the buffer to the display
-    //     // display.display();
+    // //     // display.setFont(ArialMT_Plain_10);
+    // //     // display.setTextAlignment(TEXT_ALIGN_RIGHT);
+    // //     // display.drawString(128, 54, String(millis()));
+    // //     // write the buffer to the display
+    // //     // display.display();
 
-    //     // Led blink
-    //     // Blink before arrival
-    //     int startTimeBlink = tStart - (60*30);
+    // //     // Led blink
+    // //     // Blink before arrival
+    // //     int startTimeBlink = tStart - (60*30);
 
-    //     unsigned long currentMillis = millis();
-    //     if(now() >= startTimeBlink && now() < tStart){
-    //         if (currentMillis - previousMillis >= interval) {
-    //             // save the last time you blinked the LED
-    //             previousMillis = currentMillis;
-    //             // if the LED is off turn it on and vice-versa:
-    //             if (ledState == LOW) {
-    //                 ledState = HIGH;
-    //             } else {
-    //                 ledState = LOW;
-    //             }
-    //             // set the LED with the ledState of the variable:
-    //             digitalWrite(LED_PIN, ledState);
-    //         }
-    //     }
-    //     else if(now() >= tStart && now() < tEnd){
-    //         // Shine during the flight
-    //         digitalWrite(LED_PIN, HIGH);
-    //     }
-    //     else if(now() >= tEnd){
-    //         previousMillis = 0;
-    //         ledState = LOW;
-    //         digitalWrite(LED_PIN, LOW);
-    //         // Change the tracking date
-    //         if(currentPassesIndex + 1 < doc["passes"].size()){
-    //           currentPassesIndex++;
-    //         }
-    //         else {
-    //           String satName = doc["info"]["satname"];
-    //           display.setFont(ArialMT_Plain_16);
-    //           display.drawString(0, 16, "End prediction for " + satName + "!");
-    //         }
-    //     }
+    // //     unsigned long currentMillis = millis();
+    // //     if(now() >= startTimeBlink && now() < tStart){
+    // //         if (currentMillis - previousMillis >= interval) {
+    // //             // save the last time you blinked the LED
+    // //             previousMillis = currentMillis;
+    // //             // if the LED is off turn it on and vice-versa:
+    // //             if (ledState == LOW) {
+    // //                 ledState = HIGH;
+    // //             } else {
+    // //                 ledState = LOW;
+    // //             }
+    // //             // set the LED with the ledState of the variable:
+    // //             digitalWrite(LED_PIN, ledState);
+    // //         }
+    // //     }
+    // //     else if(now() >= tStart && now() < tEnd){
+    // //         // Shine during the flight
+    // //         digitalWrite(LED_PIN, HIGH);
+    // //     }
+    // //     else if(now() >= tEnd){
+    // //         previousMillis = 0;
+    // //         ledState = LOW;
+    // //         digitalWrite(LED_PIN, LOW);
+    // //         // Change the tracking date
+    // //         if(currentPassesIndex + 1 < doc["passes"].size()){
+    // //           currentPassesIndex++;
+    // //         }
+    // //         else {
+    // //           String satName = doc["info"]["satname"];
+    // //           display.setFont(ArialMT_Plain_16);
+    // //           display.drawString(0, 16, "End prediction for " + satName + "!");
+    // //         }
+    // //     }
+    // //   }
+    // //   else{
+    // //     String satName = doc["info"]["satname"];
+    // //     String message = "Not " + satName + "!";
+    // //     display.setFont(ArialMT_Plain_16);
+    // //     display.drawString(0, 16, message);
     //   }
-    //   else{
-    //     String satName = doc["info"]["satname"];
-    //     String message = "Not " + satName + "!";
-    //     display.setFont(ArialMT_Plain_16);
-    //     display.drawString(0, 16, message);
-      }
-    }
+    // }
     //display.display();
 
     delay(200);
