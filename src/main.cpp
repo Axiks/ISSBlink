@@ -2,14 +2,9 @@
 #include <Arduino.h>
 #include <EEPROM.h>
 
-// Oled display lib
-#include <SPI.h>
-#include <Wire.h>
-#include "SSD1306Wire.h"
-
-// Nokia display
-#include <Adafruit_GFX.h>
-#include <Adafruit_PCD8544.h>
+// Display lib
+#include <OledDisplay.h> 
+#include <NokiaDisplay.h>
 
 // Wifi lib
 #include <WiFi.h>
@@ -24,13 +19,15 @@
 #include <TimeLib.h>
 #include <NTPClient.h>
 
+#include <models/Satelite.h>
+#include <models/Prediction.h>
+#include <models/SatelitePredictions.h>
+
 // Config
 #include <configuration.h>
 #define CONFIG_VERSION "dem4"
 
-#define SDA_PIN 23
-#define SCL_PIN 19
-#define LED_PIN 22
+//#define LED_PIN 22
 
 // -- Method declarations.
 //void handleRoot();
@@ -42,116 +39,11 @@
 #define STRING_LEN 128
 #define NUMBER_LEN 32
 
-
 bool timeLoad = false;
 bool issLoad = false;
 
-class NokiaDisplay {
-    private:
-      // Adafruit_PCD8544(CLK,DIN,D/C,CE,RST);
-      Adafruit_PCD8544 displayNokia = Adafruit_PCD8544(18, 4, 0, 2, 15);
-
-    public:
-      NokiaDisplay(){
-        // -- Initializing the nokia display configuration.
-        displayNokia.begin();
-        displayNokia.setContrast(55);
-        displayNokia.clearDisplay();
-      }
-
-      void printSateliteName(String name){
-        displayNokia.setTextSize(1);
-        displayNokia.setTextColor(BLACK);
-        displayNokia.setCursor(0,14);
-        displayNokia.println(name);
-        displayNokia.display();
-      }
-
-      void printText(String message){
-        //displayNokia.clearDisplay();
-        displayNokia.setTextSize(0.5);
-        displayNokia.setTextColor(BLACK);
-        displayNokia.setCursor(0,24);
-        displayNokia.println(message);
-        displayNokia.display();
-      }
-
-      void printTime(String time){
-        displayNokia.setTextSize(1);
-        displayNokia.setTextColor(BLACK);
-        displayNokia.setCursor(0,0);
-        displayNokia.println(time);
-        displayNokia.display();
-      }
-
-      void printPredisctionsCount(int count){
-        displayNokia.setTextSize(1);
-        displayNokia.setTextColor(BLACK);
-        displayNokia.setCursor(76,40);
-        displayNokia.println(count);
-        displayNokia.display();
-      }
-
-      void clearDisplay(){
-        displayNokia.clearDisplay();
-        displayNokia.display();
-      }
-
-};
 NokiaDisplay *nokiaDisplay;
-
-class OledDisplay {
-    private:
-      SSD1306Wire displayOled = SSD1306Wire(0x3c, SDA_PIN, SCL_PIN, GEOMETRY_128_32);
-
-    public:
-      OledDisplay(){
-        //Initialising the UI will init the display too.
-        displayOled.init();
-        displayOled.flipScreenVertically();
-        displayOled.setTextAlignment(TEXT_ALIGN_LEFT);
-        displayOled.setFont(ArialMT_Plain_10);
-      }
-
-      void printText(String message){
-        displayOled.clear();
-        displayOled.drawString(0, 0, message);
-        displayOled.display();
-      }
-
-      int x, minX;
-      void printScrollText(String message)
-      {
-        while(true){
-          
-        }
-
-        displayOled.clear();
-        displayOled.setFont(ArialMT_Plain_10);
-        displayOled.drawString(x, 0, message);
-
-        displayOled.display();
-        x=x+8; // scroll speed, make more positive to slow down the scroll
-        if(x < minX) x= displayOled.width();
-      }
-};
 OledDisplay *oledDisplay;
-
-class Notification{
-    public:
-      int ledState = LOW;
-      Notification(){
-        pinMode(LED_PIN, OUTPUT);
-      }
-
-      void startNotifyOverflight(){
-        
-      }
-
-      void stopNotifyOverflight(){
-        
-      }
-};
 
 
 String formTime(int datetime){
@@ -190,104 +82,10 @@ void clearEEPROM()
     Serial.println("End clear EEPROM!");
 }
 
-class Satelite{
-    public:
-      int id;
-      String name;
-      float lat;
-      float lon;
-      float alt;
-      float minVisiblityBrightness;
-      int predictionDays;
-
-      Satelite(int id, String name, float lat, float lon, float alt, float minVisiblityBrightness, int predictionDays){
-        this -> id = id;
-        this -> name = name;
-        this -> lat = lat;
-        this -> lon = lon;
-        this -> alt = alt;
-        this -> minVisiblityBrightness = minVisiblityBrightness;
-        this -> predictionDays = predictionDays;}
-};
-
-class Prediction{
-    private:
-      int startUTC;
-      int maxUTC;
-      int endUTC;
-      int duration;
-    public:
-      Prediction(int startUTC, int maxUTC, int endUTC, int duration)
-      : startUTC(startUTC), maxUTC(maxUTC), endUTC(endUTC), duration(duration)
-      {}
-
-      void setStartUTC(int startUTC){
-        this -> startUTC = startUTC;
-      }
-
-      int getStartUTC(){
-        return this -> startUTC;
-      }
-
-      void setMaxUTC(int maxUTC){
-        this -> maxUTC = maxUTC;
-      }
-
-      int getMaxUTC(){
-        return this -> maxUTC;
-      }
-
-      void setEndUTC(int endUTC){
-        this -> endUTC = endUTC;
-      }
-
-      int getEndUTC(){
-        return this -> endUTC;
-      }
-
-      void setDuration(int duration){
-        this -> duration = duration;
-      }
-
-      int getDuration(){
-        return this -> duration;
-      }
-};
-class SatelitePredictions{
-    private:
-      Satelite *satelite;
-      short predictionPushIndex;
-    public:
-      Prediction *predictions[15];
-
-      SatelitePredictions(Satelite *satelite)
-      : satelite(satelite)
-      {
-        predictionPushIndex = 0;
-      }
-
-      Satelite *getSatelite(){
-        return this -> satelite;
-      }
-
-      void addPrediction(Prediction *prediction){
-        predictions[predictionPushIndex] = prediction;
-        Serial.print("ADDED PREDICTION!");
-        predictionPushIndex++;
-      }
-
-      short count(){
-        return predictionPushIndex;
-      }
-
-      Prediction **getPredictions(){
-        return this -> predictions;
-      }
-};
 class SateliteService{
     private:
       HTTPClient client;
-      DynamicJsonDocument doc = DynamicJsonDocument(2048);
+      DynamicJsonDocument doc = DynamicJsonDocument(4096);
     public:
       SateliteService()
       {
@@ -384,7 +182,6 @@ class APControl{
       }
 };
 
-//25544, "ISS", "0.000", "0.000", "1", "100", "2"
 Satelite *mySatelite;
 APControl *apControl;
 SatelitePredictions *satelitePredictions;
@@ -500,18 +297,18 @@ class WebApp{
 };
 
 WebApp *myWebApp;
+int startTime = 0;
 
 void setup()
 {
     Serial.begin(115200);
     //clearEEPROM();
+    nokiaDisplay = new NokiaDisplay(18, 4, 0, 2, 15);
+    //nokiaDisplay -> printText("Hello Neko Space!");
+    nokiaDisplay -> printLogo();
 
-    nokiaDisplay = new NokiaDisplay();
-    nokiaDisplay -> printText("Hello Neko Space!");
-
-    OledDisplay oledDisplay;
-    oledDisplay.printText("Start");
-    oledDisplay.printText("Hello Neko Space!");
+    //OledDisplay oledDisplay = OledDisplay(23, 19);
+    //oledDisplay.printText("Hello Neko Space!");
 
     mySatelite = new Satelite(25544, "ISS", 0.000, 0.000, 1, 100, 2);
     //satelitePredictions = new SatelitePredictions(mySatelite);
@@ -526,20 +323,19 @@ void setup()
     Serial.println("Satelite lon: " + String(mySatelite -> lon));
     Serial.println("Satelite alt: " + String(mySatelite -> alt));
     Serial.println("Satelite minVisiblityBrightness: " + String(mySatelite -> minVisiblityBrightness));
+
+    startTime = second();
 }
 
 // unsigned long previousMillis = 0;
 // const long interval = 1000;
 
 int currentPassesIndex = 0;
-int loopDelay = 100;
+int loopDelay = 800;
 
 void loop() {
     // -- doLoop should be called as frequently as possible.
     apControl -> iotWebConf.doLoop();
-    // // clear the display
-    // display.clear();
-    // display.setTextAlignment(TEXT_ALIGN_LEFT);
 
     if(timeLoad){
         String timeNowFormated = "t now " + formTime(now()+(2*60*60));
